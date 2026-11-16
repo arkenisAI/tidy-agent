@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidy Agent</title>
+<style>
+  :root {
+    --bg: #f6f1ea; --panel: #fffdf9; --ink: #2b2620; --muted: #8a7f72; --line: #ece4d8;
+    --accent: #ff7a59; --accent-ink: #fff; --green: #2fa36b; --blue: #3a7bd5; --amber: #e2a114;
+    --violet: #8b5cf6; --red: #d64545; --radius: 18px;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); }
+  header { display: flex; align-items: center; gap: 14px; padding: 18px 28px; }
+  .brand { font-weight: 800; font-size: 20px; letter-spacing: -.3px; }
+  .brand span { color: var(--accent); }
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px;
+          background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--green); } .dot.bad { background: var(--red); } .dot.warn { background: var(--amber); }
+  .spacer { flex: 1; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           padding: 8px 14px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  button:hover { border-color: #d8ccbb; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.small { padding: 5px 10px; font-size: 12px; border-radius: 9px; }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 9px; color: var(--muted); }
+  .seg button.on { background: var(--ink); color: #fff; }
+  .seg.mini { padding: 2px; margin-left: 4px; border-radius: 999px; }
+  .seg.mini button { padding: 3px 10px; font-size: 12px; border-radius: 999px; }
+
+  main { padding: 0 28px 28px; display: grid; gap: 18px; grid-template-columns: 320px minmax(0, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; }
+
+  /* mascot */
+  .mascot-card { display: flex; flex-direction: column; align-items: center; text-align: center; grid-row: span 2; }
+  .bubble { position: relative; background: var(--bg); border-radius: 16px; padding: 12px 14px; font-size: 14px;
+            line-height: 1.4; margin-bottom: 14px; min-height: 48px; width: 100%; }
+  .bubble:after { content: ""; position: absolute; bottom: -9px; left: 50%; margin-left: -9px; border: 9px solid transparent;
+                  border-top-color: var(--bg); border-bottom: 0; }
+  .mascot { width: 220px; height: 220px; display: grid; place-items: center; }
+  .mascot img, .mascot svg { width: 100%; height: 100%; object-fit: contain; }
+  .mascot.idle { animation: float 4s ease-in-out infinite; }
+  .mascot.working { animation: bob .6s ease-in-out infinite; }
+  .mascot.happy { animation: hop .8s ease-out 2; }
+  .mascot.sleep { opacity: .65; filter: saturate(.6); animation: breathe 5s ease-in-out infinite; }
+  .mascot.waiting { animation: tilt 2.4s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-8px); } }
+  @keyframes bob { 50% { transform: translateY(-5px) rotate(-2deg); } }
+  @keyframes hop { 30% { transform: translateY(-26px) scale(1.04); } 60% { transform: translateY(0) scale(.97, 1.03); } }
+  @keyframes breathe { 50% { transform: scale(1.03); } }
+  @keyframes tilt { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+  .antenna-bulb { transition: fill .3s; }
+  .mascot.working .antenna-bulb { fill: #ffd84d; }
+  .mascot-meta { margin-top: 14px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .mascot-meta b { color: var(--ink); }
+
+  /* stats */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+  .stat .label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .stat .value { font-size: 34px; font-weight: 800; letter-spacing: -1px; margin-top: 4px; }
+  .stat .sub { font-size: 12px; color: var(--muted); }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; }
+
+  /* lists */
+  .lists { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) 200px auto; gap: 12px; align-items: center;
+         padding: 10px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .fname { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fsub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--line); background: #fff; width: 100%; }
+  .actions { display: flex; gap: 6px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
+  .chip.done { background: #e3f5ec; color: var(--green); }
+  .chip.doing { background: #fff0d6; color: #a86f00; }
+  .chip.scheduled { background: #e6eefb; color: var(--blue); }
+  .chip.review { background: #efe8fe; color: var(--violet); }
+  .chip.failed { background: #fde6e6; color: var(--red); }
+  .chip.skipped, .chip.undone, .chip.gone { background: #f0ece6; color: var(--muted); }
+  .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-left: 6px; }
+  .head-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff;
+           padding: 10px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none;
+           max-width: calc(100vw - 32px); text-align: center; }
+  .toast.show { opacity: 1; }
+  .arow { grid-template-columns: minmax(0, 1fr) 110px auto; }
+  .picker { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--muted);
+            order: 3; width: 100%; }
+  .picker select { flex: 1; min-width: 0; width: 100%; }
+  main > * { min-width: 0; }
+  button.danger { color: var(--red); }
+  button.danger.confirm { background: var(--red); color: #fff; border-color: var(--red); }
+  .chip.deleted { background: #f0ece6; color: var(--muted); }
+  .hint-text { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .hint-text code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+  .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .cat-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 10px;
+              padding: 5px 6px 5px 10px; font-size: 13px; font-weight: 600; max-width: 100%; }
+  .cat-chip small { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-chip button { border: 0; background: transparent; padding: 0 6px; min-height: 0; color: var(--muted); font-size: 15px; }
+  .cat-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cat-form input, .newcat input { font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 9px;
+                                   border: 1px solid var(--line); background: #fff; min-width: 0; }
+  .cat-form button { grid-column: 1 / -1; justify-self: start; }
+  .newcat { display: flex; gap: 6px; }
+  .newcat input { flex: 1; }
+  @media (max-width: 680px) { .cat-form { grid-template-columns: 1fr; } .cat-form button { justify-self: stretch; } }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* Desktop: bubble, mascot, meta stacked in one column */
+  .mascot-text { display: contents; }
+  .mascot-card { align-self: start; position: sticky; top: 16px; }
+  .mascot-card .bubble { order: 0; } .mascot-card .mascot { order: 1; } .mascot-card .mascot-meta { order: 2; }
+
+  /* ---------- responsive ---------- */
+  header { flex-wrap: wrap; }
+  .fname, .fsub { min-width: 0; }
+  .row > div { min-width: 0; }
+
+  /* Tablet: mascot becomes a horizontal banner above the stats */
+  @media (max-width: 1100px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .mascot-card { grid-row: auto; position: static; flex-direction: row; text-align: left; gap: 20px; align-items: center; }
+    .mascot-card .mascot { width: 150px; height: 150px; flex: none; order: -1; }
+    .mascot-card .mascot-text { display: block; flex: 1; min-width: 0; order: 0; }
+    .bubble { margin-bottom: 8px; }
+    .bubble:after { left: -9px; top: 50%; bottom: auto; margin: -9px 0 0; border: 9px solid transparent;
+                    border-right-color: var(--bg); border-left: 0; }
+    .mascot-meta { margin-top: 4px; }
+  }
+
+  /* Phone */
+  @media (max-width: 680px) {
+    header { padding: 14px 16px; gap: 10px; }
+    .brand { font-size: 18px; }
+    .spacer { display: none; }
+    .controls { width: 100%; }
+    .controls .seg { flex: 1 1 100%; }
+    .controls .seg button { flex: 1; white-space: nowrap; }
+    .controls button { white-space: nowrap; }
+    .controls > button { flex: 1; }
+    main { padding: 0 16px 20px; gap: 14px; }
+    .card { padding: 14px; }
+    .mascot-card { gap: 12px; }
+    .mascot-card .mascot { width: 96px; height: 96px; }
+    .bubble { font-size: 13px; padding: 10px 12px; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .stat { padding: 12px 14px; }
+    .stat .value { font-size: 28px; }
+    .stat .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* review rows stack: name, category picker, buttons */
+    .row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 0; }
+    .row .actions { justify-content: stretch; }
+    .row .actions button { flex: 1; padding: 9px 10px; font-size: 13px; }
+    /* activity rows: name + chip on one line, buttons under */
+    .row.arow { grid-template-columns: minmax(0, 1fr) auto; }
+    .row.arow .actions { grid-column: 1 / -1; }
+    .row.arow .actions:empty { display: none; }
+    button { min-height: 38px; }
+  }
+
+  /* Very small phones */
+  @media (max-width: 380px) {
+    .stat .value { font-size: 24px; }
+    .mascot-card .mascot { width: 76px; height: 76px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) { .mascot { animation: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Tidy<span>.</span>agent</div>
+  <div class="pill" id="aiPill"><span class="dot" id="aiDot"></span><span id="aiText">Checking AI…</span>
+    <span class="seg mini" title="Which AI sorts the files no rule covers"><button id="beOllama">Ollama</button><button id="beLaya">Laya</button></span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <div class="seg" title="Review first: the agent proposes, you approve. Autopilot: it moves files itself.">
+      <button id="modeReview">Review first</button><button id="modeAuto">Autopilot</button>
+    </div>
+    <button id="pauseBtn">Pause</button>
+    <button id="refreshBtn" title="Re-read the folders: picks up files you deleted, moved or sorted by hand">Refresh</button>
+    <button class="primary" id="scanBtn">Scan now</button>
+  </div>
+</header>
+
+<main>
+  <section class="card mascot-card">
+    <div class="mascot-text">
+      <div class="bubble" id="bubble">Waking up…</div>
+      <div class="mascot-meta" id="meta"></div>
+      <label class="picker">Mascot <select id="mascotPick"></select></label>
+    </div>
+    <div class="mascot idle" id="mascot"></div>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><div class="label"><span class="swatch" style="background:var(--ink)"></span>Total work</div>
+      <div class="value" id="sTotal">0</div><div class="sub" id="sTotalSub">&nbsp;</div></div>
+    <div class="stat"><div class="label"><span class="swatch" style="background:var(--green)"></span>Done</div>
+      <div class="value" id="sDone">0</div><div class="sub" id="sDoneSub">&nbsp;</div></div>
+    <div class="stat"><div class="label"><span class="swatch" style="background:var(--amber)"></span>Doing</div>
+      <div class="value" id="sDoing">0</div><div class="sub" id="sDoingSub">&nbsp;</div></div>
+    <div class="stat"><div class="label"><span class="swatch" style="background:var(--blue)"></span>Scheduled</div>
+      <div class="value" id="sScheduled">0</div><div class="sub" id="sScheduledSub">&nbsp;</div></div>
+  </section>
+
+  <section class="lists">
+    <div class="card">
+      <div class="head-row"><h2>Waiting for your OK <span id="reviewCount"></span></h2>
+        <button class="small primary" id="approveAll">Approve all</button></div>
+      <div id="reviewList"></div>
+    </div>
+    <div class="card">
+      <div class="head-row"><h2>Activity</h2>
+        <button class="small" id="clearRemoved">Clear removed</button></div>
+      <div id="activity"></div>
+    </div>
+    <div class="card">
+      <h2>Your categories</h2>
+      <div class="hint-text">Add your own folders. <b>Keywords</b> and <b>extensions</b> are instant rules (no AI needed);
+        the <b>description</b> helps the AI pick it. Use <code>Parent/Child</code> for a sub-folder.</div>
+      <div id="customCats" class="cat-list"></div>
+      <form id="catForm" class="cat-form" autocomplete="off">
+        <input name="name" placeholder="Folder name, e.g. Bank/Statements" required maxlength="60">
+        <input name="hint" placeholder="Description for the AI (optional)" maxlength="200">
+        <input name="keywords" placeholder="Keywords in file name, comma separated (optional)">
+        <input name="extensions" placeholder="Extensions, e.g. .sketch, .ofx (optional)">
+        <button class="primary" type="submit">Add category</button>
+      </form>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<!-- Fallback mascot, used until you drop your own PNGs into static/assets/ -->
+<template id="defaultMascot">
+<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="Tidy mascot">
+  <defs>
+    <filter id="fluff" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="9"/>
+    </filter>
+    <radialGradient id="fur" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#ffd9c9"/><stop offset="1" stop-color="#ff9e80"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="110" cy="200" rx="58" ry="8" fill="#000" opacity=".08"/>
+  <line x1="110" y1="52" x2="110" y2="30" stroke="#6b5d50" stroke-width="4" stroke-linecap="round"/>
+  <circle class="antenna-bulb" cx="110" cy="26" r="8" fill="#ffb199"/>
+  <g filter="url(#fluff)"><ellipse cx="110" cy="122" rx="78" ry="72" fill="url(#fur)"/></g>
+  <rect x="62" y="90" width="96" height="58" rx="26" fill="#3b3430"/>
+  <ellipse cx="90" cy="118" rx="8" ry="10" fill="#9ff3d8"/><ellipse cx="130" cy="118" rx="8" ry="10" fill="#9ff3d8"/>
+  <circle cx="93" cy="114" r="3" fill="#fff"/><circle cx="133" cy="114" r="3" fill="#fff"/>
+  <path d="M100 134 q10 8 20 0" stroke="#9ff3d8" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="64" cy="150" r="8" fill="#ff8a6b" opacity=".6"/><circle cx="156" cy="150" r="8" fill="#ff8a6b" opacity=".6"/>
+  <rect x="78" y="172" width="18" height="22" rx="9" fill="#6b5d50"/><rect x="124" y="172" width="18" height="22" rx="9" fill="#6b5d50"/>
+</svg>
+</template>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S = null, mascotKey = "", busy = false;
+// Category picked in the review list, kept until the server confirms it (fixes the "jumps back" bug).
+const picked = {};
+// Lists are only rebuilt when their data changes, so a dropdown you're using is never reset.
+let reviewSig = "", activitySig = "", catsSig = "", mascotSig = "";
+const armed = {};  // two-step "Delete" buttons waiting for the second click
+
+async function api(path, body) {
+  const r = await fetch(path, {method: body === undefined ? "GET" : "POST",
+    headers: {"Content-Type": "application/json"}, body: body === undefined ? undefined : JSON.stringify(body)});
+  return r.json();
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+async function act(path, body, okMsg) {
+  const res = await api(path, body || {});
+  if (res && res.ok === false) toast(res.message || "Something went wrong"); else if (okMsg || (res && res.message)) toast(okMsg || res.message);
+  refresh();
+  return res;
+}
+function ago(ts) {
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago"; return Math.floor(s / 86400) + " d ago";
+}
+function mmss(s) { return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function editing(container) {
+  const a = document.activeElement;
+  return a && container.contains(a) && (a.tagName === "SELECT" || a.tagName === "INPUT");
+}
+
+/* ---------- mascot ---------- */
+function mascotState(s) {
+  if (s.paused) return "sleep";
+  if (s.stats.doing > 0 || s.current) return "working";
+  if (s.last_done_ago !== null && s.last_done_ago < 15) return "happy";
+  if (s.stats.review > 0) return "waiting";
+  return "idle";
+}
+function mascotSrc(set, st) {
+  if (!set) return null;
+  for (const k of [st, "idle"]) if (set.states[k]) return set.states[k];
+  return set.base || Object.values(set.states)[0] || null;
+}
+function renderMascot(s, st) {
+  const m = s.mascot, el = $("mascot");
+  const set = m.sets.find((x) => x.id === m.selected);
+  const src = m.selected === "builtin" ? null : mascotSrc(set, st);
+  el.className = "mascot " + st;
+  const key = st + "|" + (src || "svg");
+  if (key !== mascotKey) {
+    mascotKey = key;
+    el.innerHTML = src ? `<img src="${src}" alt="Mascot">` : $("defaultMascot").innerHTML;
+  }
+  const sig = JSON.stringify([m.selected, m.sets.map((x) => [x.id, Object.keys(x.states).length])]);
+  if (sig !== mascotSig && document.activeElement !== $("mascotPick")) {
+    mascotSig = sig;
+    const poses = (x) => { const n = Object.keys(x.states).length; return n ? ` · ${n} pose${n > 1 ? "s" : ""}` : ""; };
+    $("mascotPick").innerHTML = m.sets.map((x) =>
+      `<option value="${esc(x.id)}" ${x.id === m.selected ? "selected" : ""}>${esc(x.label)}${poses(x)}</option>`).join("") +
+      `<option value="builtin" ${m.selected === "builtin" ? "selected" : ""}>Fluffy robot (built-in)</option>`;
+  }
+}
+function bubbleText(s, st) {
+  if (!s.ai.online) return "I can't reach Ollama. Start it and I'll pick up where I left off. (Simple files still get sorted.)";
+  if (!s.ai.model_ready && s.backend === "laya") return "Laya isn't installed. Run <code>.venv\\Scripts\\pip install laya</code>, or switch back to Qwen.";
+  if (!s.ai.model_ready) return `Ollama is up, but I can't find <b>${esc(s.ai.model)}</b>. Run <code>ollama pull ${esc(s.ai.model)}</code>.`;
+  if (st === "sleep") return "Taking a nap. Press <b>Resume</b> when you need me.";
+  if (st === "working") return `Sorting <b>${esc(s.current || "a file")}</b>…`;
+  if (st === "happy") return "Done! Another one tidied up. ✨";
+  if (st === "waiting") return `${s.stats.review} file${s.stats.review > 1 ? "s are" : " is"} waiting for your OK.`;
+  if (s.stats.scheduled > 0) return `${s.stats.scheduled} file${s.stats.scheduled > 1 ? "s" : ""} in the queue. Letting downloads finish first.`;
+  return `All tidy. Next look around in ${mmss(s.next_scan_in)}.`;
+}
+
+/* ---------- lists ---------- */
+function howText(r) {
+  if (r.method === "ai") return `AI ${Math.round((r.confidence || 0) * 100)}% sure`;
+  return {memory: "seen before", you: "picked by you", rule: "rule", fallback: "AI unavailable"}[r.method] || esc(r.method || "");
+}
+function categoryOptions(cats, cur) {
+  const list = cats.includes(cur) ? cats : [cur, ...cats];
+  return list.map((c) => `<option ${c === cur ? "selected" : ""}>${esc(c)}</option>`).join("") +
+    `<option value="__new__">+ New category…</option>`;
+}
+function renderReview(s) {
+  for (const r of s.review) if (picked[r.id] !== undefined && picked[r.id] === r.category) delete picked[r.id];
+  const box = $("reviewList");
+  const sig = JSON.stringify([s.review.map((r) => [r.id, r.category, r.method]), s.categories, picked, s.mode]);
+  if (sig === reviewSig || editing(box) || Object.keys(armed).length) return;
+  reviewSig = sig;
+  box.innerHTML = s.review.length ? s.review.map((r) => {
+    const cur = picked[r.id] ?? r.category;
+    return `<div class="row">
+      <div><div class="fname" title="${esc(r.src)}">${esc(r.name)}</div>
+        <div class="fsub">${esc(r.source_name)} · ${howText(r)} · ${esc(r.reason || "")}</div></div>
+      <div class="catcell" data-cell="${r.id}"><select data-id="${r.id}" aria-label="Folder">${categoryOptions(s.categories, cur)}</select></div>
+      <div class="actions"><button class="small primary" data-approve="${r.id}">Move</button>
+        <button class="small" data-reject="${r.id}">Leave it</button>
+        <button class="small danger" data-trash="${r.id}" title="Move this file to the Trash">Delete</button></div>
+    </div>`;
+  }).join("") : `<div class="empty">Nothing waiting. ${s.mode === "review" ? "New proposals will show up here." : "Autopilot is on: only unsure guesses land here."}</div>`;
+}
+function renderActivity(s) {
+  const box = $("activity");
+  const sig = JSON.stringify([s.recent.map((r) => [r.id, r.status, r.updated, r.category]), Math.floor(Date.now() / 30000)]);
+  if (sig === activitySig || Object.keys(armed).length) return;
+  activitySig = sig;
+  box.innerHTML = s.recent.length ? s.recent.map((r) => {
+    const where = r.status === "done" ? "→ " + esc(r.category) : r.error ? esc(r.error) : esc(r.reason || r.source_name);
+    const del = `<button class="small danger" data-trash="${r.id}" title="Move this file to the Trash">Delete</button>`;
+    let btns = "";
+    if (r.status === "done") btns = `<button class="small" data-open="${r.id}">Show</button><button class="small" data-undo="${r.id}">Undo</button>${del}`;
+    else if (r.status === "failed") btns = `<button class="small" data-retry="${r.id}">Retry</button><button class="small" data-remove="${r.id}" title="Remove from the list">✕</button>`;
+    else if (r.status === "gone" || r.status === "deleted") btns = `<button class="small" data-remove="${r.id}" title="Remove from the list">✕</button>`;
+    else if (r.status === "undone" || r.status === "skipped") btns = del;
+    const label = {review: "needs OK", gone: "removed", deleted: "deleted"}[r.status] || r.status;
+    const tag = r.method === "ai" ? '<span class="tag">AI</span>' : r.method === "memory" ? '<span class="tag">Seen before</span>' : r.method === "you" ? '<span class="tag">You</span>' : "";
+    return `<div class="row arow">
+      <div><div class="fname" title="${esc(r.dest || r.src)}">${esc(r.name)}${tag}</div>
+        <div class="fsub">${where} · ${ago(r.updated)}</div></div>
+      <div><span class="chip ${r.status}">${label}</span></div>
+      <div class="actions">${btns}</div></div>`;
+  }).join("") : `<div class="empty">No activity yet. Press <b>Scan now</b> to start.</div>`;
+}
+function renderCategories(s) {
+  const sig = JSON.stringify(s.custom_categories);
+  if (sig === catsSig) return;
+  catsSig = sig;
+  $("customCats").innerHTML = s.custom_categories.length ? s.custom_categories.map((c) => {
+    const bits = [c.keywords.length ? "keywords: " + c.keywords.join(", ") : "", c.extensions.length ? c.extensions.join(" ") : "", c.hint].filter(Boolean).join(" · ");
+    return `<span class="cat-chip" title="${esc(bits)}">${esc(c.name)}${bits ? ` <small>${esc(bits)}</small>` : ""}<button data-catdel="${esc(c.name)}" title="Remove category">✕</button></span>`;
+  }).join("") : `<div class="empty">No custom categories yet.</div>`;
+}
+
+function render(s) {
+  const st = mascotState(s);
+  renderMascot(s, st);
+  $("bubble").innerHTML = bubbleText(s, st);
+  $("aiDot").className = "dot " + (s.ai.online && s.ai.model_ready ? "ok" : s.ai.online ? "warn" : "bad");
+  $("aiText").textContent = s.ai.online ? (s.ai.model_ready ? "AI ready" : s.backend === "laya" ? "Laya not installed" : "Model missing") : "AI offline";
+  $("beOllama").textContent = s.ollama_model;
+  $("beOllama").classList.toggle("on", s.backend !== "laya");
+  $("beLaya").classList.toggle("on", s.backend === "laya");
+  $("modeReview").classList.toggle("on", s.mode === "review");
+  $("modeAuto").classList.toggle("on", s.mode === "auto");
+  $("pauseBtn").textContent = s.paused ? "Resume" : "Pause";
+
+  const t = s.stats;
+  $("sTotal").textContent = t.total;
+  $("sTotalSub").textContent = [`${t.skipped} skipped`, t.removed ? `${t.removed} removed` : "", `${t.failed} failed`,
+    t.found ? `${t.found} already sorted` : ""].filter(Boolean).join(" · ");
+  $("sDone").textContent = t.done;
+  $("sDoneSub").textContent = `${t.done_today} today · ${t.done_by_ai} by AI` + (t.remembered ? ` · ${t.remembered} remembered` : "");
+  $("sDoing").textContent = t.doing; $("sDoingSub").textContent = s.current ? s.current : "idle";
+  $("sScheduled").textContent = t.scheduled + t.review; $("sScheduledSub").textContent = `${t.scheduled} queued · ${t.review} need review`;
+  $("meta").innerHTML = "Watching " + s.sources.map((x) => `<b>${esc(x.name)}</b>`).join(" & ") +
+    `<br>Next scan in ${mmss(s.next_scan_in)}`;
+  $("meta").title = "History & settings are kept in " + s.data_dir;
+
+  $("reviewCount").textContent = s.review.length ? `(${s.review.length})` : "";
+  $("approveAll").style.display = s.review.length ? "" : "none";
+  $("clearRemoved").style.display = t.removed ? "" : "none";
+  renderReview(s);
+  renderActivity(s);
+  renderCategories(s);
+}
+
+async function refresh() {
+  if (busy) return; busy = true;
+  try { S = await api("/api/state"); render(S); }
+  catch (e) { $("bubble").textContent = "Lost connection to the agent. Is the app still running?"; $("mascot").className = "mascot sleep"; }
+  finally { busy = false; }
+}
+
+/* ---------- actions ---------- */
+function armOrRun(btn, key, run) {
+  if (armed[key]) { clearTimeout(armed[key]); delete armed[key]; run(); return; }
+  btn.dataset.label = btn.textContent; btn.textContent = "Sure?"; btn.classList.add("confirm");
+  armed[key] = setTimeout(() => { delete armed[key]; btn.classList.remove("confirm"); btn.textContent = btn.dataset.label; }, 3000);
+}
+function forceRedraw() { reviewSig = activitySig = catsSig = ""; }
+
+function showNewCategory(cell, id, previous) {
+  cell.innerHTML = `<form class="newcat"><input placeholder="New folder, e.g. Bank/Statements" maxlength="60" required>
+    <button class="small primary">Add</button><button class="small" type="button" data-cancel>✕</button></form>`;
+  const form = cell.querySelector("form"), input = form.querySelector("input");
+  input.focus();
+  const cancel = () => { forceRedraw(); refresh(); };
+  form.querySelector("[data-cancel]").onclick = cancel;
+  input.onkeydown = (e) => { if (e.key === "Escape") cancel(); };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const res = await api("/api/category_add", {name: input.value});
+    if (!res.ok) { toast(res.message); input.focus(); return; }
+    picked[id] = res.name;
+    await api("/api/set_category", {id, category: res.name});
+    toast(`${res.message} and picked it`);
+    input.blur(); forceRedraw(); refresh();
+  };
+}
+
+document.addEventListener("change", async (e) => {
+  const sel = e.target;
+  if (sel.id === "mascotPick") { mascotKey = ""; mascotSig = ""; await act("/api/mascot", {id: sel.value}); sel.blur(); return; }
+  if (!sel.matches("select[data-id]")) return;
+  const id = +sel.dataset.id;
+  if (sel.value === "__new__") { showNewCategory(sel.closest(".catcell"), id); return; }
+  picked[id] = sel.value;
+  const res = await api("/api/set_category", {id, category: sel.value});
+  if (res && res.ok === false) { toast(res.message); delete picked[id]; }
+  sel.blur(); refresh();
+});
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("button"); if (!btn) return;
+  const d = btn.dataset;
+  if (d.approve) {
+    const id = +d.approve, sel = document.querySelector(`select[data-id="${id}"]`);
+    const category = picked[id] ?? (sel && sel.value !== "__new__" ? sel.value : null);
+    act("/api/approve", {id, category}, "Moved");
+  }
+  else if (d.reject) act("/api/reject", {id: +d.reject}, "Left in place");
+  else if (d.undo) act("/api/undo", {id: +d.undo}, "Moved back");
+  else if (d.retry) act("/api/retry", {id: +d.retry}, "Trying again");
+  else if (d.open) api("/api/open", {id: +d.open});
+  else if (d.remove) act("/api/remove", {id: +d.remove});
+  else if (d.trash) armOrRun(btn, "t" + d.trash, () => { forceRedraw(); act("/api/trash", {id: +d.trash}); });
+  else if (d.catdel) armOrRun(btn, "c" + d.catdel, () => act("/api/category_remove", {name: d.catdel}));
+});
+
+$("catForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const res = await act("/api/category_add", Object.fromEntries(f.entries()));
+  if (res && res.ok) e.target.reset();
+};
+$("scanBtn").onclick = () => act("/api/scan", {}, "Looking around…");
+$("refreshBtn").onclick = () => { forceRedraw(); act("/api/refresh", {}); };
+$("clearRemoved").onclick = () => act("/api/clear_removed", {});
+$("pauseBtn").onclick = () => act(S && S.paused ? "/api/resume" : "/api/pause", {}, S && S.paused ? "Back to work" : "Paused");
+$("modeReview").onclick = () => act("/api/mode", {mode: "review"}, "I'll ask before moving anything");
+$("modeAuto").onclick = () => act("/api/mode", {mode: "auto"}, "Autopilot on");
+$("beOllama").onclick = () => act("/api/backend", {backend: "ollama"}, `Sorting with ${S ? S.ollama_model : "Ollama"}`);
+$("beLaya").onclick = () => act("/api/backend", {backend: "laya"}, "Sorting with Laya");
+$("approveAll").onclick =() => act("/api/approve_all", {});
+refresh(); setInterval(refresh, 1500);
+</script>
+</body>
+</html>
