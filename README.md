@@ -109,11 +109,11 @@ Created on the first run. Edit it, then restart the app.
 
 ## Using Laya instead of Ollama
 
+Add the `laya` package to the command you start Tidy with:
 ```
-.venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cpu
-.venv\Scripts\pip install laya
+uvx --with laya --from https://github.com/arkenisAI/tidy-agent/archive/refs/heads/main.zip tidy-agent
 ```
-Then set `"backend": "laya"` in `config.json` (run `python app.py --where` to find it). Laya is an open-source (Apache 2.0) decision model; its multilingual checkpoint is ~322M parameters and that runs on the CPU. It's newer and less proven than Qwen, so try it in Review mode first.
+Then set `"backend": "laya"` in `config.json` (add `--where` to the same command to find it) and start Tidy again with the line above. Laya is an open-source (Apache 2.0) decision model; its multilingual checkpoint is ~322M parameters and that runs on the CPU. It's newer and less proven than Qwen, so try it in Review mode first.
 
 ## Mascots
 
